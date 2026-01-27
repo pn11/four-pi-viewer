@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sample Trip - 360° Photo Viewer</title>
+    <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+    <div class="viewer-header">
+        <a href="../../" class="back-link">&larr;</a>
+        <h1>Sample Trip</h1>
+    </div>
+
+    <div class="viewer-container" id="container"></div>
+    <div class="loading" id="loading">Loading...</div>
+    <div class="thumbnail-strip" id="thumbnails"></div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+    <script type="module">
+        import { initViewer } from '../../js/viewer.js';
+
+        // List all photos for this travel
+        const photos = [
+            'photos/20251231_160400_AD256634.jpg'
+        ];
+
+        initViewer({
+            container: 'container',
+            photos: photos,
+            thumbnailStrip: 'thumbnails'
+        });
+    </script>
+</body>
+</html>
