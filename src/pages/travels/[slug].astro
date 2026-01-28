@@ -1,15 +1,11 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import fs from 'node:fs';
-import path from 'node:path';
 
-export function getStaticPaths() {
-  const travelsDir = new URL('../../content/travels', import.meta.url).pathname;
-  const travelFiles = fs.readdirSync(travelsDir).filter(f => f.endsWith('.json'));
+export async function getStaticPaths() {
+  const travelFiles = import.meta.glob('../../content/travels/*.json', { eager: true });
 
-  return travelFiles.map(file => {
-    const content = fs.readFileSync(path.join(travelsDir, file), 'utf-8');
-    const travel = JSON.parse(content);
+  return Object.values(travelFiles).map((module: any) => {
+    const travel = module.default;
     return {
       params: { slug: travel.slug },
       props: { travel }
