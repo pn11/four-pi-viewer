@@ -1,0 +1,375 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import fs from 'node:fs';
+import path from 'node:path';
+
+export function getStaticPaths() {
+  const travelsDir = new URL('../../content/travels', import.meta.url).pathname;
+  const travelFiles = fs.readdirSync(travelsDir).filter(f => f.endsWith('.json'));
+
+  return travelFiles.map(file => {
+    const content = fs.readFileSync(path.join(travelsDir, file), 'utf-8');
+    const travel = JSON.parse(content);
+    return {
+      params: { slug: travel.slug },
+      props: { travel }
+    };
+  });
+}
+
+interface Travel {
+  title: string;
+  slug: string;
+  photos: string[];
+}
+
+const { travel } = Astro.props as { travel: Travel };
+const base = import.meta.env.BASE_URL.endsWith('/')
+  ? import.meta.env.BASE_URL
+  : import.meta.env.BASE_URL + '/';
+const photoPaths = travel.photos.map(p => `${base}travels/${travel.slug}/photos/${p}`);
+---
+
+<Layout title={`${travel.title} - 360° Photo Viewer`}>
+  <Fragment slot="head">
+    <script type="importmap" set:html={JSON.stringify({
+      imports: {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    })} />
+  </Fragment>
+
+  <style>
+    .viewer-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(10px);
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      z-index: 100;
+      transition: opacity 0.3s;
+    }
+
+    .back-link {
+      color: #fff;
+      text-decoration: none;
+      font-size: 1.5rem;
+      line-height: 1;
+    }
+
+    .viewer-header h1 {
+      font-size: 1.1rem;
+      font-weight: 500;
+      flex: 1;
+    }
+
+    .fullscreen-btn {
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: background 0.2s;
+    }
+
+    .fullscreen-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .viewer-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 1.2rem;
+      color: #888;
+      z-index: 10;
+    }
+
+    .thumbnail-strip {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(10px);
+      padding: 12px;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      z-index: 100;
+      transition: opacity 0.3s;
+    }
+
+    .thumbnail-strip::-webkit-scrollbar {
+      height: 6px;
+    }
+
+    .thumbnail-strip::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .thumbnail-strip::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 3px;
+    }
+
+    :global(.thumbnail) {
+      flex-shrink: 0;
+      width: 80px;
+      height: 60px;
+      border-radius: 6px;
+      overflow: hidden;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+
+    :global(.thumbnail:hover) {
+      transform: scale(1.05);
+    }
+
+    :global(.thumbnail.active) {
+      border-color: #fff;
+    }
+
+    :global(.thumbnail img) {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  </style>
+
+  <div class="viewer-header" id="header">
+    <a href={`${base}`} class="back-link">&larr;</a>
+    <h1>{travel.title}</h1>
+    <button class="fullscreen-btn" id="fullscreen-btn" title="Fullscreen (F)">
+      <span id="fs-icon">&#x26F6;</span>
+    </button>
+  </div>
+
+  <div class="viewer-container" id="container"></div>
+  <div class="loading" id="loading">Loading...</div>
+  <div class="thumbnail-strip" id="thumbnails"></div>
+
+  <script is:inline define:vars={{ photoPaths }}>
+    window.__PHOTOS__ = photoPaths;
+  </script>
+
+  <script type="module" is:inline>
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { VRButton } from 'three/addons/webxr/VRButton.js';
+
+    const photos = window.__PHOTOS__;
+    const container = document.getElementById('container');
+    const loadingEl = document.getElementById('loading');
+    const thumbnailStrip = document.getElementById('thumbnails');
+
+    let currentIndex = 0;
+
+    // Scene setup
+    const scene = new THREE.Scene();
+
+    // Camera
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 0, 0.1);
+
+    // Renderer
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.xr.enabled = true;
+    container.appendChild(renderer.domElement);
+
+    // VR Button
+    const vrButton = VRButton.createButton(renderer);
+    vrButton.style.bottom = '100px';
+    document.body.appendChild(vrButton);
+
+    // Sphere geometry (inverted for viewing from inside)
+    const geometry = new THREE.SphereGeometry(500, 60, 40);
+    geometry.scale(-1, 1, 1);
+
+    // Material
+    const textureLoader = new THREE.TextureLoader();
+    const material = new THREE.MeshBasicMaterial();
+    const sphere = new THREE.Mesh(geometry, material);
+    scene.add(sphere);
+
+    // Load photo
+    function loadPhoto(index) {
+      if (index < 0 || index >= photos.length) return;
+      currentIndex = index;
+      if (loadingEl) loadingEl.style.display = 'block';
+
+      textureLoader.load(
+        photos[index],
+        (texture) => {
+          texture.colorSpace = THREE.SRGBColorSpace;
+          if (material.map) material.map.dispose();
+          material.map = texture;
+          material.needsUpdate = true;
+          if (loadingEl) loadingEl.style.display = 'none';
+        },
+        undefined,
+        (error) => {
+          console.error('Error loading texture:', error);
+          if (loadingEl) loadingEl.textContent = 'Error loading image';
+        }
+      );
+
+      // Update thumbnail selection
+      thumbnailStrip.querySelectorAll('.thumbnail').forEach((thumb, i) => {
+        thumb.classList.toggle('active', i === index);
+      });
+    }
+
+    // Create thumbnails
+    photos.forEach((photo, index) => {
+      const thumb = document.createElement('div');
+      thumb.className = 'thumbnail' + (index === 0 ? ' active' : '');
+      thumb.innerHTML = `<img src="${photo}" alt="Photo ${index + 1}">`;
+      thumb.addEventListener('click', () => loadPhoto(index));
+      thumbnailStrip.appendChild(thumb);
+    });
+
+    // OrbitControls
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableZoom = false;
+    controls.enablePan = false;
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.1;
+    controls.rotateSpeed = -0.25;
+    controls.minDistance = 0.1;
+    controls.maxDistance = 0.1;
+
+    // Zoom via FOV
+    let fov = 75;
+    const minFov = 30;
+    const maxFov = 100;
+
+    renderer.domElement.addEventListener('wheel', (event) => {
+      event.preventDefault();
+      fov += event.deltaY * 0.05;
+      fov = Math.max(minFov, Math.min(maxFov, fov));
+      camera.fov = fov;
+      camera.updateProjectionMatrix();
+    }, { passive: false });
+
+    // Touch zoom (pinch)
+    let touchStartDistance = 0;
+    let touchStartFov = fov;
+
+    function getTouchDistance(touches) {
+      const dx = touches[0].clientX - touches[1].clientX;
+      const dy = touches[0].clientY - touches[1].clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    renderer.domElement.addEventListener('touchstart', (event) => {
+      if (event.touches.length === 2) {
+        touchStartDistance = getTouchDistance(event.touches);
+        touchStartFov = fov;
+      }
+    }, { passive: true });
+
+    renderer.domElement.addEventListener('touchmove', (event) => {
+      if (event.touches.length === 2) {
+        const distance = getTouchDistance(event.touches);
+        const scale = touchStartDistance / distance;
+        fov = touchStartFov * scale;
+        fov = Math.max(minFov, Math.min(maxFov, fov));
+        camera.fov = fov;
+        camera.updateProjectionMatrix();
+      }
+    }, { passive: true });
+
+    // Window resize
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Fullscreen
+    const fullscreenBtn = document.getElementById('fullscreen-btn');
+    const fsIcon = document.getElementById('fs-icon');
+    const header = document.getElementById('header');
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+      } else {
+        document.exitFullscreen();
+      }
+    }
+
+    function updateFullscreenUI() {
+      if (document.fullscreenElement) {
+        fsIcon.innerHTML = '&#x2716;'; // X icon
+        header.style.opacity = '0';
+        thumbnailStrip.style.opacity = '0';
+      } else {
+        fsIcon.innerHTML = '&#x26F6;'; // Fullscreen icon
+        header.style.opacity = '1';
+        thumbnailStrip.style.opacity = '1';
+      }
+    }
+
+    fullscreenBtn.addEventListener('click', toggleFullscreen);
+    document.addEventListener('fullscreenchange', updateFullscreenUI);
+
+    // Show/hide UI on mouse move in fullscreen
+    let hideTimeout;
+    document.addEventListener('mousemove', () => {
+      if (document.fullscreenElement) {
+        header.style.opacity = '1';
+        thumbnailStrip.style.opacity = '1';
+        clearTimeout(hideTimeout);
+        hideTimeout = setTimeout(() => {
+          if (document.fullscreenElement) {
+            header.style.opacity = '0';
+            thumbnailStrip.style.opacity = '0';
+          }
+        }, 2000);
+      }
+    });
+
+    // Keyboard navigation
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowLeft') loadPhoto(currentIndex - 1);
+      else if (event.key === 'ArrowRight') loadPhoto(currentIndex + 1);
+      else if (event.key === 'f' || event.key === 'F') toggleFullscreen();
+      else if (event.key === 'Escape' && document.fullscreenElement) {
+        // Escape is handled by browser, but update UI
+      }
+    });
+
+    // Animation loop
+    renderer.setAnimationLoop(() => {
+      controls.update();
+      renderer.render(scene, camera);
+    });
+
+    // Load first photo
+    loadPhoto(0);
+  </script>
+</Layout>

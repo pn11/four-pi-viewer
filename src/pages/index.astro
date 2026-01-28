@@ -1,0 +1,93 @@
+---
+import Layout from '../layouts/Layout.astro';
+import fs from 'node:fs';
+import path from 'node:path';
+
+// Load all travels
+const travelsDir = new URL('../content/travels', import.meta.url).pathname;
+const travelFiles = fs.readdirSync(travelsDir).filter(f => f.endsWith('.json'));
+
+const travels = travelFiles.map(file => {
+  const content = fs.readFileSync(path.join(travelsDir, file), 'utf-8');
+  return JSON.parse(content);
+});
+
+const base = import.meta.env.BASE_URL.endsWith('/')
+  ? import.meta.env.BASE_URL
+  : import.meta.env.BASE_URL + '/';
+---
+
+<Layout title="360° Photo Viewer">
+  <style>
+    .home-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 40px;
+      font-weight: 300;
+    }
+
+    .travels-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 24px;
+    }
+
+    .travel-card {
+      background: #222;
+      border-radius: 12px;
+      overflow: hidden;
+      text-decoration: none;
+      color: inherit;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .travel-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    .travel-card img {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+    }
+
+    .travel-card-info {
+      padding: 16px;
+    }
+
+    .travel-card-info h2 {
+      font-size: 1.25rem;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    .travel-card-info p {
+      color: #888;
+      font-size: 0.9rem;
+    }
+  </style>
+
+  <div class="home-container">
+    <h1>360° Photo Viewer</h1>
+    <div class="travels-grid">
+      {travels.map((travel) => (
+        <a href={`travels/${travel.slug}/`} class="travel-card">
+          <img
+            src={`${base}travels/${travel.slug}/photos/${travel.photos[0]}`}
+            alt={travel.title}
+          />
+          <div class="travel-card-info">
+            <h2>{travel.title}</h2>
+            <p>{travel.photos.length} photo{travel.photos.length !== 1 ? 's' : ''}</p>
+          </div>
+        </a>
+      ))}
+    </div>
+  </div>
+</Layout>
