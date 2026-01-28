@@ -1,6 +1,6 @@
 import { defineConfig } from 'astro/config';
 
 export default defineConfig({
-  site: 'https://example.github.io',
+  site: 'https://pn11.github.io',
   base: '/four-pi-viewer',
 });
