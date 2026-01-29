@@ -69,10 +69,13 @@ const base = import.meta.env.BASE_URL.endsWith('/')
   <div class="home-container">
     <h1>360° Photo Viewer</h1>
     <div class="travels-grid">
-      {travels.map((travel) => (
+      {travels.map((travel) => {
+        const firstPhoto = travel.photos[0];
+        const photoFile = typeof firstPhoto === 'string' ? firstPhoto : firstPhoto.file;
+        return (
         <a href={`travels/${travel.slug}/`} class="travel-card">
           <img
-            src={`${base}travels/${travel.slug}/photos/${travel.photos[0]}`}
+            src={`${base}travels/${travel.slug}/photos/${photoFile}`}
             alt={travel.title}
           />
           <div class="travel-card-info">
@@ -80,7 +83,7 @@ const base = import.meta.env.BASE_URL.endsWith('/')
             <p>{travel.photos.length} photo{travel.photos.length !== 1 ? 's' : ''}</p>
           </div>
         </a>
-      ))}
+      )})}
     </div>
   </div>
 </Layout>

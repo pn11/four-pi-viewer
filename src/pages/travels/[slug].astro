@@ -13,17 +13,34 @@ export async function getStaticPaths() {
   });
 }
 
+interface Photo {
+  file: string;
+  title?: string;
+  description?: string;
+}
+
 interface Travel {
   title: string;
   slug: string;
-  photos: string[];
+  photos: (string | Photo)[];
 }
 
 const { travel } = Astro.props as { travel: Travel };
 const base = import.meta.env.BASE_URL.endsWith('/')
   ? import.meta.env.BASE_URL
   : import.meta.env.BASE_URL + '/';
-const photoPaths = travel.photos.map(p => `${base}travels/${travel.slug}/photos/${p}`);
+
+// Normalize photos to always be objects
+const photoData = travel.photos.map(p => {
+  if (typeof p === 'string') {
+    return { file: `${base}travels/${travel.slug}/photos/${p}` };
+  }
+  return {
+    file: `${base}travels/${travel.slug}/photos/${p.file}`,
+    title: p.title,
+    description: p.description
+  };
+});
 ---
 
 <Layout title={`${travel.title} - 360° Photo Viewer`}>
@@ -151,6 +168,36 @@ const photoPaths = travel.photos.map(p => `${base}travels/${travel.slug}/photos/
       height: 100%;
       object-fit: cover;
     }
+
+    .photo-info {
+      position: fixed;
+      bottom: 100px;
+      left: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(10px);
+      padding: 16px 20px;
+      border-radius: 12px;
+      z-index: 90;
+      transition: opacity 0.3s;
+      pointer-events: none;
+    }
+
+    .photo-info:empty {
+      display: none;
+    }
+
+    .photo-info h2 {
+      font-size: 1.1rem;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    .photo-info p {
+      font-size: 0.9rem;
+      color: #aaa;
+      margin: 0;
+    }
   </style>
 
   <div class="viewer-header" id="header">
@@ -163,10 +210,11 @@ const photoPaths = travel.photos.map(p => `${base}travels/${travel.slug}/photos/
 
   <div class="viewer-container" id="container"></div>
   <div class="loading" id="loading">Loading...</div>
+  <div class="photo-info" id="photo-info"></div>
   <div class="thumbnail-strip" id="thumbnails"></div>
 
-  <script is:inline define:vars={{ photoPaths }}>
-    window.__PHOTOS__ = photoPaths;
+  <script is:inline define:vars={{ photoData }}>
+    window.__PHOTOS__ = photoData;
   </script>
 
   <script type="module" is:inline>
@@ -178,6 +226,7 @@ const photoPaths = travel.photos.map(p => `${base}travels/${travel.slug}/photos/
     const container = document.getElementById('container');
     const loadingEl = document.getElementById('loading');
     const thumbnailStrip = document.getElementById('thumbnails');
+    const photoInfo = document.getElementById('photo-info');
 
     let currentIndex = 0;
 
@@ -214,10 +263,11 @@ const photoPaths = travel.photos.map(p => `${base}travels/${travel.slug}/photos/
     function loadPhoto(index) {
       if (index < 0 || index >= photos.length) return;
       currentIndex = index;
+      const photo = photos[index];
       if (loadingEl) loadingEl.style.display = 'block';
 
       textureLoader.load(
-        photos[index],
+        photo.file,
         (texture) => {
           texture.colorSpace = THREE.SRGBColorSpace;
           if (material.map) material.map.dispose();
@@ -232,6 +282,16 @@ const photoPaths = travel.photos.map(p => `${base}travels/${travel.slug}/photos/
         }
       );
 
+      // Update photo info
+      if (photo.title || photo.description) {
+        photoInfo.innerHTML = `
+          ${photo.title ? `<h2>${photo.title}</h2>` : ''}
+          ${photo.description ? `<p>${photo.description}</p>` : ''}
+        `;
+      } else {
+        photoInfo.innerHTML = '';
+      }
+
       // Update thumbnail selection
       thumbnailStrip.querySelectorAll('.thumbnail').forEach((thumb, i) => {
         thumb.classList.toggle('active', i === index);
@@ -242,7 +302,7 @@ const photoPaths = travel.photos.map(p => `${base}travels/${travel.slug}/photos/
     photos.forEach((photo, index) => {
       const thumb = document.createElement('div');
       thumb.className = 'thumbnail' + (index === 0 ? ' active' : '');
-      thumb.innerHTML = `<img src="${photo}" alt="Photo ${index + 1}">`;
+      thumb.innerHTML = `<img src="${photo.file}" alt="${photo.title || 'Photo ' + (index + 1)}">`;
       thumb.addEventListener('click', () => loadPhoto(index));
       thumbnailStrip.appendChild(thumb);
     });
@@ -323,10 +383,12 @@ const photoPaths = travel.photos.map(p => `${base}travels/${travel.slug}/photos/
         fsIcon.innerHTML = '&#x2716;'; // X icon
         header.style.opacity = '0';
         thumbnailStrip.style.opacity = '0';
+        photoInfo.style.opacity = '0';
       } else {
         fsIcon.innerHTML = '&#x26F6;'; // Fullscreen icon
         header.style.opacity = '1';
         thumbnailStrip.style.opacity = '1';
+        photoInfo.style.opacity = '1';
       }
     }
 
@@ -339,11 +401,13 @@ const photoPaths = travel.photos.map(p => `${base}travels/${travel.slug}/photos/
       if (document.fullscreenElement) {
         header.style.opacity = '1';
         thumbnailStrip.style.opacity = '1';
+        photoInfo.style.opacity = '1';
         clearTimeout(hideTimeout);
         hideTimeout = setTimeout(() => {
           if (document.fullscreenElement) {
             header.style.opacity = '0';
             thumbnailStrip.style.opacity = '0';
+            photoInfo.style.opacity = '0';
           }
         }, 2000);
       }

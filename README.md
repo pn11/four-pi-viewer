@@ -38,10 +38,18 @@ npm run preview
   "slug": "my-trip",
   "photos": [
     "photo1.jpg",
-    "photo2.jpg"
+    {
+      "file": "photo2.jpg",
+      "title": "Sunset View",
+      "description": "Beautiful sunset from the mountain top"
+    }
   ]
 }
 ```
+
+Photos can be either:
+- A string (just the filename)
+- An object with `file` (required), `title` (optional), and `description` (optional)
 
 2. Add photos to `public/travels/my-trip/photos/`
 
