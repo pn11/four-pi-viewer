@@ -1,9 +1,17 @@
 ---
 interface Props {
   title: string;
+  description?: string;
+  image?: string;
+  url?: string;
 }
 
-const { title } = Astro.props;
+const { title, description, image, url } = Astro.props;
+const siteUrl = import.meta.env.SITE || 'https://pn11.github.io';
+const baseUrl = import.meta.env.BASE_URL || '/four-pi-viewer';
+const fullUrl = url ? `${siteUrl}${baseUrl}${url}` : `${siteUrl}${baseUrl}`;
+const fullImage = image ? `${siteUrl}${baseUrl}${image}` : undefined;
+const defaultDescription = '360° photo viewer with VR support';
 ---
 
 <!doctype html>
@@ -12,6 +20,20 @@ const { title } = Astro.props;
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{title}</title>
+    <meta name="description" content={description || defaultDescription} />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description || defaultDescription} />
+    <meta property="og:url" content={fullUrl} />
+    {fullImage && <meta property="og:image" content={fullImage} />}
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content={fullImage ? "summary_large_image" : "summary"} />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description || defaultDescription} />
+    {fullImage && <meta name="twitter:image" content={fullImage} />}
     <style is:global>
       * {
         margin: 0;
