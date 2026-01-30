@@ -91,7 +91,7 @@ const photoData = travel.photos.map(p => {
       flex: 1;
     }
 
-    .fullscreen-btn {
+    .header-btn {
       background: rgba(255, 255, 255, 0.1);
       border: none;
       color: #fff;
@@ -100,9 +100,12 @@ const photoData = travel.photos.map(p => {
       cursor: pointer;
       font-size: 1rem;
       transition: background 0.2s;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
     }
 
-    .fullscreen-btn:hover {
+    .header-btn:hover {
       background: rgba(255, 255, 255, 0.2);
     }
 
@@ -212,7 +215,8 @@ const photoData = travel.photos.map(p => {
   <div class="viewer-header" id="header">
     <a href={`${base}`} class="back-link">&larr;</a>
     <h1>{travel.title}</h1>
-    <button class="fullscreen-btn" id="fullscreen-btn" title="Fullscreen (F)">
+    <a class="header-btn" id="download-btn" title="Download" download>&#x2B07;</a>
+    <button class="header-btn" id="fullscreen-btn" title="Fullscreen (F)">
       <span id="fs-icon">&#x26F6;</span>
     </button>
   </div>
@@ -236,6 +240,7 @@ const photoData = travel.photos.map(p => {
     const loadingEl = document.getElementById('loading');
     const thumbnailStrip = document.getElementById('thumbnails');
     const photoInfo = document.getElementById('photo-info');
+    const downloadBtn = document.getElementById('download-btn');
 
     let currentIndex = 0;
 
@@ -300,6 +305,9 @@ const photoData = travel.photos.map(p => {
       } else {
         photoInfo.innerHTML = '';
       }
+
+      // Update download button
+      downloadBtn.href = photo.file;
 
       // Update thumbnail selection
       thumbnailStrip.querySelectorAll('.thumbnail').forEach((thumb, i) => {
